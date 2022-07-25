@@ -1,7 +1,8 @@
 #!/usr/bin/env sh
 
 cc=gcc
-cc_flags=-Iinclude
+cc_flags="-Iinclude"
+ld_flags="-lpthread -ltinfo"
 
 bin_dir=bin
 src_dir=testing
@@ -14,6 +15,6 @@ do
     outfile=$bin_dir/$(echo $file | rev | cut -c3- | rev)
     srcfile=$src_dir/$file
 
-    $cc -o $outfile $srcfile $cc_flags
+    $cc -o $outfile $srcfile $cc_flags $ld_flags
     echo "[CC] $srcfile -> $outfile"
 done
