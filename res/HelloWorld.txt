@@ -1,0 +1,8 @@
+I am a file, this is used to test file IO and maybe other stuff
+idk what i decide to do in the future lmao
+i wonder if people actually look in the `res` folder
+its usually just openned if it has some shaders or what not
+but i am not shader
+i am just a text file
+
+some new lines for good measure ;)
