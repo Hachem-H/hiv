@@ -91,22 +91,64 @@ static char* hiv_ColorToEscapeCode(hiv_TermColors color, int isBG)
         CONSOLE_SCREEN_BUFFER_INFO csbi;
         COORD homeCoords = {0,0};
         DWORD cellCount;
-        HANDLE hStdOut;
+        HANDLE stdOutHandle;
         DWORD count;
 
-        hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-        if (hStdOut == INVALID_HANDLE_VALUE)             return;
-        if (!GetConsoleScreenBufferInfo(hStdOut, &csbi)) return;
+        stdOutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (stdOutHandle == INVALID_HANDLE_VALUE) 
+            return;
 
         cellCount = csbi.dwSize.X*csbi.dwSize.Y;
 
-        if (!FillConsoleOutputCharacter(hStdOut, (TCHAR) ' ',      cellCount, homeCoords, &count)) return;
-        if (!FillConsoleOutputAttribute(hStdOut, csbi.wAttributes, cellCount, homeCoords, &count)) return;
+        if (!FillConsoleOutputCharacter(stdOutHandle, (TCHAR) ' ', 
+                                        cellCount, homeCoords, &count)) 
+            return;
+        if (!FillConsoleOutputAttribute(stdOutHandle, csbi.wAttributes, 
+                                        cellCount, homeCoords, &count)) 
+            return;
 
         SetConsoleCursorPosition( hStdOut, homeCoords );
     }
+
+    static void hiv_GetTermSize(uint32_t* columns, uint32_t* rows)
+    {
+        CONSOLE_SCREEN_BUFFER csbi;
+        HANDLE stdOutHandle;
+
+        stdOutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (stdOutHandle == INVALID_HANDLE_VALUE) 
+            return;
+
+        GetConsoleScreenBufferInfo(stdOutHandle, &csbi);
+        *columns = csbi.srWindow.Right - csbi.srWindow.Left + 1; 
+        *rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+    }
+
+    static void hiv_SetCursorPosition(uint32_t x, uint32_t y)
+    {
+        COORD position = { x, y };
+        HANDLE stdOutHandle;
+
+        stdOutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (stdOutHandle == INVALID_HANDLE_VALUE) 
+            return;
+        
+        SetCursorPosition(output, position);
+    }
+
+    static void hiv_GetCursorPosition(uint32_t* x, uint32_t* y)
+    {
+        POINT point;
+        GetCursorPos(&point);
+
+        *x = point.x;
+        *y = point.y;
+    }
 #else
+    #include <sys/ioctl.h>
+    #include <termios.h>
     #include <unistd.h>
+    #include <stdio.h>
     #include <term.h>
 
     static void hiv_TermClear()
@@ -121,5 +163,58 @@ static char* hiv_ColorToEscapeCode(hiv_TermColors color, int isBG)
         }
 
         putp(tigetstr( "clear" ));
+    }
+
+    static void hiv_GetTermSize(uint32_t* columns, uint32_t* rows)
+    {
+        struct winsize max;
+        ioctl(0, TIOCGWINSZ, &max);
+        *colums = max.ws_column;
+        *rows   = max.ws_row;
+    }
+
+    static void hiv_SetCursorPosition(uint32_t x, uint32_t y)
+    {
+        printf("\033[%d;%dH", y, x);
+    }
+
+    static void hiv_GetCursorPosition(uint32_t* x, uint32_t* y)
+    {
+        char buffer[30] = 0;
+
+        struct termios term;
+        struct termios restore;
+
+        tcgetattr(0, &term);
+        tcgetattr(0, &restore);
+        term.c_lflag &= ~(ICANON|ECHO);
+        tcsetattr(0, TCSANOW, &term);
+        write(1, "\033[6n", 4);
+    
+        int ret, pow, i = 0; char character = 0;
+        for (; character != 'R'; i++)
+        {
+            ret = read(0, &character, 1);
+            if (!ret) 
+            {
+                tcsetattr(0, TCSANOW, &restore);
+                fprintf(stderr, "[ERR: hiv_GetCursorPosition]: Error reading response.\n");
+                return;
+            }
+            buffer[i] = character;
+
+            if (i < 2) 
+            {
+                tcsetattr(0, TCSANOW, &restore);
+                return;
+            }
+
+            for (i -= 2, pow = 1; buffer[i] != ';'; i--, pow *= 10)
+                *x = *x + (buffer[i] - '0') * pow;
+            for (i -= 1, pow = 1; buffer[i] != '['; i--, pow *= 10)
+                *y = *y + (buffer[i] - '0') * pow;
+
+            tcsetattr(0, TCSANOW, &restore);
+        }
     }
 #endif
