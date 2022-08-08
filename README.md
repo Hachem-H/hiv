@@ -8,8 +8,5 @@ The `ConIO` module relies on ANSII escape codes for colours which are not native
 reg add HKEY_CURRENT_USER\Console /v VirtualTerminalLevel /t REG_DWORD /d 0x00000001 /f
 ```
 
-## Modules
-All modules and their descriptions are located in the `docs/` folder, each `.md` file is named after the module it describes, and in tern the name of the header file, `FileIO.md -> FileIO.h`.
-
 ## Contributing
 This is quite a large project which will constantly be in development, whenever I want a new feature, I just add it in. Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate.
